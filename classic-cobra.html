@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Serpent | Teleport Edition</title>
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#090e19;color:#f4f0e6;font-family:Consolas,"Courier New",monospace}.wrap{width:min(1080px,96vw)}canvas{width:100%;height:auto;display:block;background:#0f1423;border:1px solid #303950;border-radius:8px;box-shadow:0 15px 50px #0008}.help{text-align:center;color:#9ba8be;font-size:12px;margin-top:12px}
+</style>
+</head>
+<body><div class="wrap"><canvas id="game" width="1080" height="720"></canvas><div class="help">ARROWS / WASD: MOVE | ESC: PAUSE</div></div>
+<script>
+"use strict";
+const canvas=document.getElementById("game"),ctx=canvas.getContext("2d");
+const W=1080,H=720,CELL=10,GAP=90,CX=W/2,CY=H/2;
+const SPEED={Easy:10,Medium:20,Hard:35};
+const C={bg:"#0f1423",panel:"#1b2337",hover:"#2b3952",mint:"#69f0be",dark:"#35be96",wall:"#b19cff",food:"#ff7382",cream:"#f4f0e6",muted:"#9ba8be"};
+const F={title:"bold 48px Consolas,monospace",normal:"22px Consolas,monospace",small:"16px Consolas,monospace"};
+const btn=(x,y,w,h,label,action)=>({x,y,w,h,label,action});
+const B={
+ easy:btn(CX-245,235,150,48,"EASY","easy"),
+ medium:btn(CX-75,235,150,48,"MEDIUM","medium"),
+ hard:btn(CX+95,235,150,48,"HARD","hard"),
+ start:btn(CX-115,310,230,48,"START GAME","start"),
+ resume:btn(CX-115,270,230,48,"RESUME","resume"),
+ restart:btn(CX-115,335,230,48,"RESTART","restart"),
+ menu:btn(CX-115,400,230,48,"MAIN MENU","menu"),
+ quit:btn(CX-115,465,230,48,"QUIT","quit")
+};
+let state="menu",mode="Medium",snake=[],direction="RIGHT",nextDirection="RIGHT",food=null,score=0,acc=0,last=0;
+const mouse={x:0,y:0};
+const moves={UP:[0,-CELL],DOWN:[0,CELL],LEFT:[-CELL,0],RIGHT:[CELL,0]};
+
+function createFood(){
+  // Every cell on the board is eligible; only snake cells are excluded.
+  const occupied = new Set(snake.map(([x, y]) => `${x},${y}`));
+  const free = [];
+
+  for (let x = 0; x <= W - CELL; x += CELL) {
+    for (let y = 0; y <= H - CELL; y += CELL) {
+      if (!occupied.has(`${x},${y}`)) free.push([x, y]);
+    }
+  }
+
+  // null only when the snake fills the entire board -> player wins.
+  if (free.length === 0) return null;
+  return free[Math.floor(Math.random() * free.length)];
+}
+function newGame(){
+  const x=W/2-100,y=H/2;
+  snake=[[x,y],[x-CELL,y],[x-2*CELL,y]];
+  direction=nextDirection="RIGHT";score=0;food=createFood();acc=0;
+}
+function startGame(){newGame();state="playing";}
+
+// Teleport only through the four centre openings. Solid edges end the game.
+function teleport(p){
+  const [x,y]=p,half=GAP/2;
+  const gapX=x>=CX-half&&x+CELL<=CX+half;
+  const gapY=y>=CY-half&&y+CELL<=CY+half;
+  if(y<0){if(gapX){p[1]=H-CELL;return true;}return false;}
+  if(y>=H){if(gapX){p[1]=0;return true;}return false;}
+  if(x<0){if(gapY){p[0]=W-CELL;return true;}return false;}
+  if(x>=W){if(gapY){p[0]=0;return true;}return false;}
+  return true;
+}
+function update(){
+  // Recovery guard: never leave the snake moving with no food on an
+  // otherwise playable board.
+  if (food === null) {
+    food = createFood();
+    if (food === null) {
+      state = "won";
+      return;
+    }
+  }
+
+  direction=nextDirection;
+  const d=moves[direction],head=[snake[0][0]+d[0],snake[0][1]+d[1]];
+  if(!teleport(head)){state="gameover";return;}
+  const ate=food!==null&&head[0]===food[0]&&head[1]===food[1];
+  const checking=ate?snake:snake.slice(0,-1);
+  if(checking.some(s=>s[0]===head[0]&&s[1]===head[1])){state="gameover";return;}
+  snake.unshift(head);
+  if(ate){
+    score++;
+    food=createFood();
+    if(food===null) {
+      state="won";
+      return;
+    }
+  }else snake.pop();
+}
+function text(str,font,color,x,y,align="center"){
+  ctx.font=font;ctx.fillStyle=color;ctx.textAlign=align;ctx.textBaseline="middle";ctx.fillText(str,x,y);
+}
+function roundRect(x,y,w,h,r,fill,stroke){
+  ctx.beginPath();ctx.roundRect(x,y,w,h,r);if(fill)ctx.fill();if(stroke)ctx.stroke();
+}
+function drawButton(b){
+  const r=canvas.getBoundingClientRect(),mx=mouse.x*W/r.width,my=mouse.y*H/r.height;
+  const hover=mx>=b.x&&mx<=b.x+b.w&&my>=b.y&&my<=b.y+b.h;
+  const selected=(b.action==="easy"&&mode==="Easy")||(b.action==="medium"&&mode==="Medium")||(b.action==="hard"&&mode==="Hard");
+  ctx.fillStyle=hover||selected?C.hover:C.panel;ctx.strokeStyle=selected?C.mint:C.wall;ctx.lineWidth=2;
+  roundRect(b.x,b.y,b.w,b.h,12,true,true);text(b.label,F.normal,C.cream,b.x+b.w/2,b.y+b.h/2);
+}
+function background(){
+  ctx.fillStyle=C.bg;ctx.fillRect(0,0,W,H);ctx.fillStyle=C.panel;
+  for(let x=25;x<W;x+=55)for(let y=25;y<H;y+=55){ctx.beginPath();ctx.arc(x,y,1,0,Math.PI*2);ctx.fill();}
+}
+function drawWalls(){
+  const a=CX-GAP/2,b=CX+GAP/2,c=CY-GAP/2,d=CY+GAP/2;
+  ctx.strokeStyle=C.wall;ctx.lineWidth=10;ctx.lineCap="butt";ctx.beginPath();
+  ctx.moveTo(0,0);ctx.lineTo(a,0);ctx.moveTo(b,0);ctx.lineTo(W,0);
+  ctx.moveTo(0,H-1);ctx.lineTo(a,H-1);ctx.moveTo(b,H-1);ctx.lineTo(W,H-1);
+  ctx.moveTo(0,0);ctx.lineTo(0,c);ctx.moveTo(0,d);ctx.lineTo(0,H);
+  ctx.moveTo(W-1,0);ctx.lineTo(W-1,c);ctx.moveTo(W-1,d);ctx.lineTo(W-1,H);ctx.stroke();
+  ctx.fillStyle=C.mint;
+  for(const [x,y] of [[a,0],[b,0],[a,H-1],[b,H-1],[0,c],[0,d],[W-1,c],[W-1,d]]){
+    ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.fill();
+  }
+}
+function drawGame(){
+  ctx.fillStyle=C.bg;ctx.fillRect(0,0,W,H);
+  // HUD sits underneath the play field so food/snake in that area stay visible
+  ctx.fillStyle="rgba(27,35,55,.6)";roundRect(12,12,220,70,12,true,false);
+  text("SCORE  "+score,F.normal,C.cream,120,35);
+  text("MODE  "+mode.toUpperCase(),F.small,C.mint,120,62);
+  text("ARROWS / WASD: MOVE     ESC: PAUSE",F.small,C.muted,W-18,25,"right");
+  drawWalls();
+  for(let i=snake.length-1;i>=1;i--){
+    const [x,y]=snake[i];ctx.fillStyle=C.dark;roundRect(x,y,CELL,CELL,3,true,false);
+    ctx.fillStyle=C.mint;roundRect(x+2,y+2,CELL-4,CELL-4,2,true,false);
+  }
+  if(snake.length){ctx.fillStyle=C.mint;roundRect(snake[0][0],snake[0][1],CELL,CELL,3,true,false);}
+  if(food!==null){ctx.fillStyle=C.food;ctx.beginPath();ctx.arc(food[0]+CELL/2,food[1]+CELL/2,CELL/2,0,Math.PI*2);ctx.fill();}
+}
+function drawMenu(){
+  background();text("SERPENT",F.title,C.mint,CX,105);text("TELEPORT EDITION",F.small,C.wall,CX,155);
+  text("Choose your difficulty",F.normal,C.cream,CX,205);
+  drawButton(B.easy);drawButton(B.medium);drawButton(B.hard);drawButton(B.start);
+  text("Eat the food. Avoid yourself. Master the portals.",F.small,C.muted,CX,405);
+  text("ARROWS / WASD to move  |  ESC to pause",F.small,C.muted,CX,440);
+  text("MIDNIGHT  /  MINT  /  LAVENDER",F.small,C.wall,CX,H-35);
+}
+function overlay(title,subtitle){
+  ctx.fillStyle="rgba(8,12,24,.84)";ctx.fillRect(0,0,W,H);
+  text(title,F.title,C.cream,CX,190);text(subtitle,F.small,C.muted,CX,235);
+}
+function drawOverlayMenu(){
+  if(state==="paused"){
+    overlay("PAUSED","The game is paused");drawButton(B.resume);drawButton(B.restart);drawButton(B.menu);drawButton(B.quit);
+  }else if(state==="gameover"||state==="won"){
+    overlay(state==="won"?"YOU WIN!":"GAME OVER","Final score: "+score);
+    drawButton(B.restart);drawButton(B.menu);drawButton(B.quit);
+  }
+}
+function render(){
+  if(state==="menu")drawMenu();
+  else{drawGame();if(["paused","gameover","won"].includes(state))drawOverlayMenu();}
+}
+function inside(b,e){
+  const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;
+  return x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h;
+}
+canvas.addEventListener("mousemove",e=>{
+  const r=canvas.getBoundingClientRect();mouse.x=e.clientX-r.left;mouse.y=e.clientY-r.top;
+});
+canvas.addEventListener("click",e=>{
+  if(state==="menu"){
+    if(inside(B.easy,e))mode="Easy";
+    else if(inside(B.medium,e))mode="Medium";
+    else if(inside(B.hard,e))mode="Hard";
+    else if(inside(B.start,e))startGame();
+    return;
+  }
+  if(state==="paused"){
+    if(inside(B.resume,e)){state="playing";acc=0;}
+    else if(inside(B.restart,e))startGame();
+    else if(inside(B.menu,e)||inside(B.quit,e))state="menu";
+    return;
+  }
+  if(state==="gameover"||state==="won"){
+    if(inside(B.restart,e))startGame();
+    else if(inside(B.menu,e)||inside(B.quit,e))state="menu";
+  }
+});
+document.addEventListener("keydown",e=>{
+  const k=e.key.toLowerCase();
+  if(["arrowup","arrowdown","arrowleft","arrowright"," "].includes(k))e.preventDefault();
+  if(k==="escape"){
+    if(state==="playing")state="paused";
+    else if(state==="paused"){state="playing";acc=0;}
+    else if(state==="gameover"||state==="won")state="menu";
+    return;
+  }
+  if((state==="gameover"||state==="won")&&(k==="r"||k==="enter")){startGame();return;}
+  if(state==="paused"){if(k==="r")startGame();return;}
+  if(state!=="playing")return;
+  if((k==="arrowup"||k==="w")&&direction!=="DOWN")nextDirection="UP";
+  else if((k==="arrowdown"||k==="s")&&direction!=="UP")nextDirection="DOWN";
+  else if((k==="arrowleft"||k==="a")&&direction!=="RIGHT")nextDirection="LEFT";
+  else if((k==="arrowright"||k==="d")&&direction!=="LEFT")nextDirection="RIGHT";
+});
+function loop(t){
+  if(!last)last=t;
+  const delta=Math.min(t-last,100);last=t;
+  if(state==="playing"){
+    acc+=delta;const interval=1000/SPEED[mode];
+    while(acc>=interval&&state==="playing"){update();acc-=interval;}
+  }else acc=0;
+  render();requestAnimationFrame(loop);
+}
+newGame();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
