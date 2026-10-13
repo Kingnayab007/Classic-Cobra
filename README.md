@@ -51,7 +51,7 @@
 No setup is needed.
 
 1. Download or clone the **Classic Cobra** repository.
-2. Open `serpent_teleport_edition_fixed.html` in any modern browser (Chrome, Edge, Firefox, Safari).
+2. Open `classic-cobra.html` in any modern browser (Chrome, Edge, Firefox, Safari).
 3. Play.
 
 ---
@@ -70,7 +70,9 @@ No setup is needed.
 
 ```
 Classic-Cobra/
-├── serpent_teleport_edition_fixed.html   # Complete game (HTML + CSS + JS)
+├── classic-cobra.html  
+├── style.css  
+├── script.js  
 └── README.md
 ```
 
