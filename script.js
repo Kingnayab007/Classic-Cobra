@@ -12,13 +12,13 @@ const W = 1080, // board width  in px
 const SPEED = { Easy: 10, Medium: 20, Hard: 35 };
 
 const C = {
-    bg: "#101318", // play field background
-    grid: "#1a1f28", // faint dot grid on the menu screen
+    bg: "#181818", // play field background
+    grid: "#010202", // faint dot grid on the menu screen
     panel: "#1c212b", // button fill
     hover: "#2a313d", // button fill on hover / when selected
     edge: "#3c4451", // button outline (unselected)
-    accent: "#f5b93b", // amber: snake head, portals, selected state
-    snake: "#c9871a", // darker amber: snake body segments
+    accent: "#f3aaaa", // amber: snake head, portals, selected state
+    snake: "#fe9c9c", // darker amber: snake body segments
     steel: "#525c6b", // walls / inactive outlines
     food: "#ff4d3d", // food only — high urgency colour
     cream: "#e9e7e3", // primary text
