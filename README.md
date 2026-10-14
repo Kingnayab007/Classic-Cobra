@@ -99,5 +99,3 @@ Classic-Cobra/
 - Additional themes
 
 ---
-
-Made with ❤️ by the Classic Cobra team.
